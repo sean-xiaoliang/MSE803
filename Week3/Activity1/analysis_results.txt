@@ -1,0 +1,326 @@
+﻿================================================================================
+STATISTICAL ANALYSIS REPORT - Week 3 Activity 1
+================================================================================
+
+1. DATA QUALITY OVERVIEW
+--------------------------------------------------------------------------------
+
+Source file: Sample_dataset.csv
+Dataset Shape: 10 rows x 7 columns
+
+Column Names: ['ID', 'Name', 'Age', 'Net worth', 'Country', 'Salary', 'Join Date']
+
+Data Types:
+ID           float64
+Name             str
+Age              str
+Net worth        str
+Country          str
+Salary           str
+Join Date        str
+dtype: object
+
+  -> Note: Age and Salary load as 'object' (text), not numbers, because
+     a single non-numeric entry forces the whole column to string type.
+     Arithmetic on these columns fails until they are cleaned.
+
+
+MISSING VALUES ANALYSIS (raw file, before cleaning):
+----------------------------------------
+   Column  Missing Count  Missing %
+       ID              1       10.0
+     Name              1       10.0
+      Age              2       20.0
+Net worth              3       30.0
+  Country              1       10.0
+   Salary              2       20.0
+Join Date              1       10.0
+
+
+2. DATA CLEANING
+--------------------------------------------------------------------------------
+
+Numeric coercion (Age, Salary, Net worth):
+  Age: 'thirty-eight' -> 38 (spelled-out number)
+  Salary: 'sixty five thousand' -> 65000 (spelled-out number)
+  Net worth: '30,000' -> 30000 (removed separators)
+
+  Missing values remaining after coercion:
+    Age: 2
+    Salary: 2
+    Net worth: 3
+
+Standardising Country codes...
+  Before: ['AU', 'AUS', 'NZ']
+  After:  ['AUS', 'NZ']
+  Merged 'AU' into 'AUS' -- same country, inconsistent coding
+
+Parsing Join Date...
+  Accepted formats: %d/%m/%Y, %Y-%m-%d
+  Parsed successfully: 8/10
+  Blank in source: 1
+  REJECTED as invalid: ['2019-13-01']
+    -> '2019-13-01' has month 13, which does not exist
+  Derived 'Tenure (years)' relative to fixed analysis date 2026-08-16
+
+Deduplicating records by ID...
+  Duplicate ID(s): [2]
+    ID 2: 2 rows
+      Complementary (one row supplies each): ['Age', 'Net worth', 'Salary']
+  Rows: 10 -> 9
+
+
+3. DESCRIPTIVE STATISTICS - NUMERICAL COLUMNS
+--------------------------------------------------------------------------------
+
+             Age        Salary     Net worth  Tenure (years)
+count   8.000000      8.000000      7.000000        7.000000
+mean   30.750000  62625.000000  38571.428571        6.515714
+std     6.363961   5655.275666  14164.005352        1.155175
+min    22.000000  55000.000000  22000.000000        5.060000
+25%    26.500000  58750.000000  29000.000000        5.775000
+50%    29.500000  62000.000000  35000.000000        6.580000
+75%    35.750000  65750.000000  47500.000000        7.105000
+max    40.000000  72000.000000  60000.000000        8.210000
+
+
+DETAILED METRIC EXPLANATIONS:
+--------------------------------------------------------------------------------
+
+AGE  (n = 8 valid observations)
+  Count      : 8
+    -> Non-missing data points. Every statistic below rests on these only.
+  Mean       : 30.75
+    -> Arithmetic average. Pulled toward extreme values.
+  Median     : 29.50
+    -> Middle value when sorted. Unaffected by extremes.
+  Std Dev    : 6.36
+    -> Typical distance from the mean (sample std, ddof=1).
+  Variance   : 40.50
+    -> Std Dev squared. Same information, squared units.
+  Min / Max  : 22.00 / 40.00
+  Range      : 18.00
+    -> Max minus Min. Simple but driven entirely by two points.
+  Q1 (25%)   : 26.50
+    -> A quarter of values fall below this.
+  Q3 (75%)   : 35.75
+    -> Three quarters of values fall below this.
+  IQR        : 9.25
+    -> Spread of the middle 50%. Basis of the outlier rule in section 6.
+  Skewness   : 0.244
+    -> roughly symmetric. Guide: <-0.5 left, -0.5..0.5 symmetric, >0.5 right.
+  Kurtosis   : -1.227
+    -> lighter tails than normal. Excess kurtosis; 0 matches a normal distribution.
+    !! n = 8 is below 20: skewness and kurtosis
+       are highly unstable here. Treat them as descriptive only.
+
+SALARY  (n = 8 valid observations)
+  Count      : 8
+    -> Non-missing data points. Every statistic below rests on these only.
+  Mean       : 62625.00
+    -> Arithmetic average. Pulled toward extreme values.
+  Median     : 62000.00
+    -> Middle value when sorted. Unaffected by extremes.
+  Std Dev    : 5655.28
+    -> Typical distance from the mean (sample std, ddof=1).
+  Variance   : 31982142.86
+    -> Std Dev squared. Same information, squared units.
+  Min / Max  : 55000.00 / 72000.00
+  Range      : 17000.00
+    -> Max minus Min. Simple but driven entirely by two points.
+  Q1 (25%)   : 58750.00
+    -> A quarter of values fall below this.
+  Q3 (75%)   : 65750.00
+    -> Three quarters of values fall below this.
+  IQR        : 7000.00
+    -> Spread of the middle 50%. Basis of the outlier rule in section 6.
+  Skewness   : 0.408
+    -> roughly symmetric. Guide: <-0.5 left, -0.5..0.5 symmetric, >0.5 right.
+  Kurtosis   : -0.659
+    -> lighter tails than normal. Excess kurtosis; 0 matches a normal distribution.
+    !! n = 8 is below 20: skewness and kurtosis
+       are highly unstable here. Treat them as descriptive only.
+
+NET WORTH  (n = 7 valid observations)
+  Count      : 7
+    -> Non-missing data points. Every statistic below rests on these only.
+  Mean       : 38571.43
+    -> Arithmetic average. Pulled toward extreme values.
+  Median     : 35000.00
+    -> Middle value when sorted. Unaffected by extremes.
+  Std Dev    : 14164.01
+    -> Typical distance from the mean (sample std, ddof=1).
+  Variance   : 200619047.62
+    -> Std Dev squared. Same information, squared units.
+  Min / Max  : 22000.00 / 60000.00
+  Range      : 38000.00
+    -> Max minus Min. Simple but driven entirely by two points.
+  Q1 (25%)   : 29000.00
+    -> A quarter of values fall below this.
+  Q3 (75%)   : 47500.00
+    -> Three quarters of values fall below this.
+  IQR        : 18500.00
+    -> Spread of the middle 50%. Basis of the outlier rule in section 6.
+  Skewness   : 0.646
+    -> right-skewed (tail of high values). Guide: <-0.5 left, -0.5..0.5 symmetric, >0.5 right.
+  Kurtosis   : -1.027
+    -> lighter tails than normal. Excess kurtosis; 0 matches a normal distribution.
+    !! n = 7 is below 20: skewness and kurtosis
+       are highly unstable here. Treat them as descriptive only.
+
+TENURE (YEARS)  (n = 7 valid observations)
+  Count      : 7
+    -> Non-missing data points. Every statistic below rests on these only.
+  Mean       : 6.52
+    -> Arithmetic average. Pulled toward extreme values.
+  Median     : 6.58
+    -> Middle value when sorted. Unaffected by extremes.
+  Std Dev    : 1.16
+    -> Typical distance from the mean (sample std, ddof=1).
+  Variance   : 1.33
+    -> Std Dev squared. Same information, squared units.
+  Min / Max  : 5.06 / 8.21
+  Range      : 3.15
+    -> Max minus Min. Simple but driven entirely by two points.
+  Q1 (25%)   : 5.78
+    -> A quarter of values fall below this.
+  Q3 (75%)   : 7.11
+    -> Three quarters of values fall below this.
+  IQR        : 1.33
+    -> Spread of the middle 50%. Basis of the outlier rule in section 6.
+  Skewness   : -0.083
+    -> roughly symmetric. Guide: <-0.5 left, -0.5..0.5 symmetric, >0.5 right.
+  Kurtosis   : -0.710
+    -> lighter tails than normal. Excess kurtosis; 0 matches a normal distribution.
+    !! n = 7 is below 20: skewness and kurtosis
+       are highly unstable here. Treat them as descriptive only.
+
+
+4. CATEGORICAL ANALYSIS
+--------------------------------------------------------------------------------
+
+COUNTRY DISTRIBUTION:
+  Distinct countries (excluding missing): 2
+
+         Count  Percent
+Country                
+NZ           5     55.6
+AUS          3     33.3
+NaN          1     11.1
+
+  -> Frequency of each category. The dominant category indicates where
+     the sample is concentrated, and therefore where findings apply.
+
+
+5. CORRELATION ANALYSIS
+--------------------------------------------------------------------------------
+
+Pearson Correlation Matrix:
+                     Age    Salary  Net worth  Tenure (years)
+Age             1.000000  0.628151   0.484272        0.716887
+Salary          0.628151  1.000000   0.153495        0.011250
+Net worth       0.484272  0.153495   1.000000        0.838707
+Tenure (years)  0.716887  0.011250   0.838707        1.000000
+
+
+INTERPRETATION GUIDE (|r| thresholds):
+----------------------------------------
+  |r| >= 0.7: Very Strong
+  |r| >= 0.5: Strong
+  |r| >= 0.3: Moderate
+  |r| >= 0.0: Weak
+  Sign: positive = move together; negative = move oppositely.
+  r measures LINEAR association only, and never proves causation.
+
+
+Key Relationships:
+
+Age vs Salary: r = 0.628  (n = 8 complete pairs)
+  -> Strong positive. r^2 = 0.39, so about 39% of the variation in one tracks the other.
+     !! Only 8 pairs -- a single record could change this materially.
+
+Age vs Net worth: r = 0.484  (n = 7 complete pairs)
+  -> Moderate positive. r^2 = 0.23, so about 23% of the variation in one tracks the other.
+     !! Only 7 pairs -- a single record could change this materially.
+
+Age vs Tenure (years): r = 0.717  (n = 6 complete pairs)
+  -> Very Strong positive. r^2 = 0.51, so about 51% of the variation in one tracks the other.
+     !! Only 6 pairs -- a single record could change this materially.
+
+Salary vs Net worth: r = 0.153  (n = 7 complete pairs)
+  -> Weak positive. r^2 = 0.02, so about 2% of the variation in one tracks the other.
+     !! Only 7 pairs -- a single record could change this materially.
+
+Salary vs Tenure (years): r = 0.011  (n = 6 complete pairs)
+  -> Weak positive. r^2 = 0.00, so about 0% of the variation in one tracks the other.
+     !! Only 6 pairs -- a single record could change this materially.
+
+Net worth vs Tenure (years): r = 0.839  (n = 5 complete pairs)
+  -> Very Strong positive. r^2 = 0.70, so about 70% of the variation in one tracks the other.
+     !! Only 5 pairs -- a single record could change this materially.
+
+
+6. OUTLIER DETECTION (IQR Method)
+--------------------------------------------------------------------------------
+
+Rule: values outside [Q1 - 1.5*IQR, Q3 + 1.5*IQR] are flagged as outliers.
+Chosen over the mean +/- 3*SD rule because quartiles are not themselves
+distorted by the very extremes being searched for.
+
+
+Age:
+  Acceptable range: [12.62, 49.62]
+  Outliers found  : 0
+  -> All values fall within the expected spread.
+
+Salary:
+  Acceptable range: [48250.00, 76250.00]
+  Outliers found  : 0
+  -> All values fall within the expected spread.
+
+Net worth:
+  Acceptable range: [1250.00, 75250.00]
+  Outliers found  : 0
+  -> All values fall within the expected spread.
+
+Tenure (years):
+  Acceptable range: [3.78, 9.10]
+  Outliers found  : 0
+  -> All values fall within the expected spread.
+
+
+7. KEY INSIGHTS & SUMMARY
+--------------------------------------------------------------------------------
+
+Data Quality:
+  - Unique records after deduplication: 9 (from 10 raw rows)
+  - Usable Age: 8/9
+  - Usable Salary: 8/9
+  - Usable Net worth: 7/9
+  - Usable Tenure (years): 7/9
+
+Age Demographics:
+  - Average age: 30.8 years (range 22-40)
+
+Salary Insights:
+  - Average salary: $62,625.00
+  - Range: $55,000.00 to $72,000.00
+  - Coefficient of variation: 9.0% (tight spread relative to the mean)
+
+Tenure Insights:
+  - Average tenure: 6.52 years (range 5.06-8.21)
+  - Excludes 2 record(s) without a usable join date
+
+Geographic Distribution:
+  - NZ: 5/9 records (56%) -- primary location
+  - Spans 2 distinct countries
+  - Missing country: 1 record(s)
+
+Principal Caveat:
+  With 9 records and missing values throughout, every figure
+  above is descriptive of THIS sample. None of it supports inference about
+  a wider population, and no correlation here establishes causation.
+
+================================================================================
+END OF REPORT
+================================================================================
