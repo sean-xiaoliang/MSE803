@@ -380,40 +380,56 @@ fig.savefig(fit_path, dpi=150, facecolor=SURFACE)
 plt.close(fig)
 
 # --- Overfitting gap ------------------------------------------------------
-labels, train_vals, cv_vals = [], [], []
+# Plotting raw RMSE would put Age errors (years, ~5) and Salary errors (dollars,
+# ~150,000) on one axis -- different units, so the bar heights would not be
+# comparable across tasks. Indexing each model against the linear model's error
+# on its OWN task gives a dimensionless ratio that is comparable everywhere.
+labels, ratios_plot, colours = [], [], []
 for ev in evaluations:
     for res in ev['results']:
         if res['train_rmse'] is None or res['cv_rmse'] is None:
             continue
-        kind = 'lin' if res['degree'] == 1 else f"d{res['degree']}"
-        labels.append(f"{ev['target'][:9]}\n{kind}")
-        train_vals.append(res['train_rmse'])
-        cv_vals.append(res['cv_rmse'])
+        kind = 'linear' if res['degree'] == 1 else f"poly d{res['degree']}"
+        labels.append(f"{ev['target'][:9]}\nfrom {ev['predictor'][:6]}\n{kind}")
+        ratios_plot.append(res['cv_rmse'] / res['train_rmse'])
+        colours.append(C_LINEAR if res['degree'] == 1 else C_POLY)
 
-fig2, ax2 = plt.subplots(figsize=(11, 5))
+fig2, ax2 = plt.subplots(figsize=(12, 5.5))
 pos = np.arange(len(labels))
-width = 0.38
-ax2.bar(pos - width / 2, train_vals, width, color=C_OBSERVED,
-        label='Training RMSE (fits its own points)', zorder=3)
-ax2.bar(pos + width / 2, cv_vals, width, color=C_LINEAR,
-        label='LOOCV RMSE (predicts unseen points)', zorder=3)
+bars = ax2.bar(pos, ratios_plot, 0.62, color=colours, zorder=3)
+
+ax2.axhline(1.0, color=INK_SECOND, linewidth=1.5, zorder=4)
+ax2.text(len(labels) - 0.4, 1.06, 'no gap (1.0x)', ha='right', va='bottom',
+         fontsize=8.5, color=INK_SECOND)
+
+# Direct-label every bar: the aqua slot sits below 3:1 on this surface, so the
+# validator's relief rule requires visible labels rather than colour alone.
+for bar, ratio in zip(bars, ratios_plot):
+    ax2.text(bar.get_x() + bar.get_width() / 2, ratio * 1.09,
+             f"{ratio:.1f}x", ha='center', va='bottom',
+             fontsize=8.5, color=INK_SECOND)
 
 ax2.set_yscale('log')
 ax2.set_xticks(pos)
-ax2.set_xticklabels(labels, fontsize=8)
-ax2.set_ylabel('RMSE (log scale)')
-ax2.set_title('Training error flatters every model; cross-validation does not',
+ax2.set_xticklabels(labels, fontsize=7.5)
+ax2.set_ylabel('LOOCV RMSE / training RMSE  (log scale)')
+ax2.set_title('How much worse each model performs on data it has not seen',
               fontsize=12, fontweight='bold', color=INK, pad=12)
 ax2.grid(True, axis='y', linewidth=0.6, alpha=0.9)
 ax2.set_axisbelow(True)
 for spine in ('top', 'right'):
     ax2.spines[spine].set_visible(False)
-ax2.legend(frameon=False, fontsize=9, labelcolor=INK_SECOND)
 
-fig2.text(0.5, 0.01, 'Log scale: the taller the orange bar stands above the blue, '
-                     'the more the model overfits.',
+handles = [plt.Rectangle((0, 0), 1, 1, color=C_LINEAR),
+           plt.Rectangle((0, 0), 1, 1, color=C_POLY)]
+ax2.legend(handles, ['Linear', 'Polynomial'], frameon=False,
+           fontsize=9, labelcolor=INK_SECOND, loc='upper left')
+
+fig2.text(0.5, 0.015, 'Ratio, not raw error, so tasks measured in years and in '
+                      'dollars can be compared on one axis. '
+                      'Every linear bar sits near 1.0; polynomials climb away from it.',
           ha='center', fontsize=8.5, color=INK_MUTED)
-fig2.tight_layout(rect=(0, 0.04, 1, 1))
+fig2.tight_layout(rect=(0, 0.05, 1, 1))
 gap_path = FIGURE_DIR / 'overfitting_gap.png'
 fig2.savefig(gap_path, dpi=150, facecolor=SURFACE)
 plt.close(fig2)
@@ -451,10 +467,24 @@ for ev in evaluations:
             kind = 'linear' if res['degree'] == 1 else f"poly d{res['degree']}"
             print(f"  {ev['target']:<12} {ev['predictor']:<16} {kind:<9} {ratio:>8.1f}x")
 
-linear_cv = [r['cv_rmse'] for ev in evaluations for r in ev['results']
-             if r['degree'] == 1 and r['cv_rmse']]
-poly_cv = [r['cv_rmse'] for ev in evaluations for r in ev['results']
-           if r['degree'] > 1 and r['cv_rmse']]
+# RMSE carries the units of its target, so an Age error in years and a Net worth
+# error in dollars cannot be averaged together. Comparing each polynomial to the
+# linear model on the SAME task gives a dimensionless ratio that can be pooled.
+print("\nPolynomial LOOCV error relative to linear, per task (1.0 = equal):")
+ratios = []
+for ev in evaluations:
+    base = next((r['cv_rmse'] for r in ev['results']
+                 if r['degree'] == 1 and r['cv_rmse']), None)
+    if not base:
+        continue
+    for res in ev['results']:
+        if res['degree'] == 1 or not res['cv_rmse']:
+            continue
+        ratio = res['cv_rmse'] / base
+        ratios.append(ratio)
+        verdict = 'better' if ratio < 1 else 'worse'
+        print(f"  {ev['target']:<12} {ev['predictor']:<16} "
+              f"poly d{res['degree']}  {ratio:>7.1f}x  ({verdict} than linear)")
 
 print("\nVERDICT")
 print("-" * 78)
@@ -463,10 +493,12 @@ if cv_wins[1] >= cv_wins[2] + cv_wins[3]:
 else:
     print("  POLYNOMIAL REGRESSION predicts these missing values better.")
 
-if linear_cv and poly_cv:
-    print(f"\n  Mean LOOCV RMSE  linear {np.mean(linear_cv):>12,.0f}")
-    print(f"                   poly   {np.mean(poly_cv):>12,.0f}"
-          f"   ({np.mean(poly_cv) / np.mean(linear_cv):.1f}x worse)")
+print(f"\n  Won on training RMSE : polynomial d3 took all {sum(train_wins.values())} tasks")
+print(f"  Won on LOOCV RMSE    : linear took {cv_wins[1]} of "
+      f"{sum(cv_wins.values())} tasks")
+if ratios:
+    print(f"\n  Median polynomial-to-linear LOOCV ratio: {np.median(ratios):.1f}x")
+    print(f"  Worst case: {max(ratios):.0f}x the linear model's error")
 
 print("""
   Why, in this dataset:

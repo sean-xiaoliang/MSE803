@@ -1,0 +1,234 @@
+==============================================================================
+WEEK 3 - ACTIVITY 2: REGRESSION IMPUTATION OF MISSING VALUES
+==============================================================================
+
+1. STARTING POINT - CLEANED DATA FROM ACTIVITY 1
+------------------------------------------------------------------------------
+
+Source: Sample_dataset.csv
+Rows: 10 raw -> 9 after merging duplicate ID(s) [2]
+Rejected dates: ['2019-13-01']
+
+   Name  Age  Salary  Net worth  Tenure (years) Country
+  Alice 25.0 55000.0    30000.0            6.58      NZ
+    Bob 30.0 60000.0    35000.0            6.49      NZ
+Charlie 35.0 72000.0    40000.0             NaN     AUS
+  David 38.0 68000.0        NaN            6.79      NZ
+    NaN 40.0 65000.0    55000.0            8.21      NZ
+  Grace 22.0 64000.0    28000.0            5.06     NaN
+  Heidi  NaN     NaN        NaN            5.06     AUS
+   Ivan 27.0 58000.0    60000.0            7.42      NZ
+    Eve 29.0 59000.0    22000.0             NaN     AUS
+
+
+REMAINING MISSING VALUES:
+------------------------------------------------------------------------------
+  Age              1 missing  ->  Heidi
+  Salary           1 missing  ->  Heidi
+  Net worth        2 missing  ->  David, Heidi
+  Tenure (years)   2 missing  ->  Charlie, Eve
+
+  Heidi is missing Age, Salary AND Net worth. Tenure is her only numeric
+  value, so every estimate for her must be predicted from that one column.
+
+
+2. CHOOSING A PREDICTOR FOR EACH GAP
+------------------------------------------------------------------------------
+
+A regression can only borrow information a predictor actually carries,
+so each gap is paired with the strongest predictor that is present for the
+row being filled.
+
+                  Age  Salary  Net worth  Tenure (years)
+Age             1.000   0.628      0.484           0.717
+Salary          0.628   1.000      0.153           0.011
+Net worth       0.484   0.153      1.000           0.839
+Tenure (years)  0.717   0.011      0.839           1.000
+
+Imputation tasks:
+  Net worth        <- Age              (r = +0.484)  for David
+  Age              <- Tenure (years)   (r = +0.717)  for Heidi
+  Net worth        <- Tenure (years)   (r = +0.839)  for Heidi
+  Salary           <- Tenure (years)   (r = +0.011)  for Heidi
+
+
+3. MODEL COMPARISON: LINEAR VS POLYNOMIAL
+------------------------------------------------------------------------------
+
+Training scores measure how well a curve retraces the points it was fitted
+to. Leave-one-out CV hides each row in turn and scores the prediction for
+it, which is the question imputation actually asks.
+
+
+==========================================================================
+Net worth  <-  Age   (for David)
+  complete training pairs: n = 7   Pearson r = +0.484
+--------------------------------------------------------------------------
+  model                   train R2    train RMSE    LOOCV RMSE
+  Linear (degree 1)          0.235        11,473        14,497
+  Polynomial (deg 2)         0.251        11,348        18,474
+  Polynomial (deg 3)         0.352        10,555        36,022
+
+  Best by training RMSE : degree 3
+  Best by LOOCV RMSE    : degree 1
+  -> DISAGREEMENT. Training scores favour degree 3, but it
+     predicts held-out rows worse than degree 1: the extra
+     curvature is fitting noise, not signal.
+
+==========================================================================
+Age  <-  Tenure (years)   (for Heidi)
+  complete training pairs: n = 6   Pearson r = +0.717
+--------------------------------------------------------------------------
+  model                   train R2    train RMSE    LOOCV RMSE
+  Linear (degree 1)          0.514          4.60          6.04
+  Polynomial (deg 2)         0.517          4.59         14.72
+  Polynomial (deg 3)         0.600          4.17        161.61
+
+  Best by training RMSE : degree 3
+  Best by LOOCV RMSE    : degree 1
+  -> DISAGREEMENT. Training scores favour degree 3, but it
+     predicts held-out rows worse than degree 1: the extra
+     curvature is fitting noise, not signal.
+
+==========================================================================
+Net worth  <-  Tenure (years)   (for Heidi)
+  complete training pairs: n = 5   Pearson r = +0.839
+--------------------------------------------------------------------------
+  model                   train R2    train RMSE    LOOCV RMSE
+  Linear (degree 1)          0.703         7,230        11,657
+  Polynomial (deg 2)         0.731         6,883        53,881
+  Polynomial (deg 3)         0.963         2,555           n/a   (needs > 5 rows, has 5)
+
+  Best by training RMSE : degree 3
+  Best by LOOCV RMSE    : degree 1
+  -> DISAGREEMENT. Training scores favour degree 3, but it
+     predicts held-out rows worse than degree 1: the extra
+     curvature is fitting noise, not signal.
+
+==========================================================================
+Salary  <-  Tenure (years)   (for Heidi)
+  complete training pairs: n = 6   Pearson r = +0.011
+--------------------------------------------------------------------------
+  model                   train R2    train RMSE    LOOCV RMSE
+  Linear (degree 1)          0.000         4,422         6,616
+  Polynomial (deg 2)         0.163         4,045         6,279
+  Polynomial (deg 3)         0.168         4,034       153,095
+
+  Best by training RMSE : degree 3
+  Best by LOOCV RMSE    : degree 2
+  -> DISAGREEMENT. Training scores favour degree 3, but it
+     predicts held-out rows worse than degree 2: the extra
+     curvature is fitting noise, not signal.
+  !! r = +0.011 is near zero: this predictor carries almost no
+     information about the target. The linear fit here is effectively
+     mean imputation wearing a regression's clothes (train R2 = 0.000),
+     and any degree that 'wins' is winning on noise.
+
+
+4. PREDICTED VALUES FOR EACH MISSING CELL
+------------------------------------------------------------------------------
+
+row     target       from                   linear     poly d2     poly d3
+------------------------------------------------------------------------------
+David   Net worth    Age                    47,885      48,555      43,952
+Heidi   Age          Tenure (years)          21.97       22.46       21.86
+Heidi   Net worth    Tenure (years)         23,691      26,245      28,049
+Heidi   Salary       Tenure (years)         61,579      63,956      63,864
+
+Spread between the two approaches:
+  David's Net worth    linear vs poly d2 differ by 670.30 (1.4% of the linear estimate)
+  Heidi's Age          linear vs poly d2 differ by 0.49 (2.2% of the linear estimate)
+  Heidi's Net worth    linear vs poly d2 differ by 2,554 (10.8% of the linear estimate)
+  Heidi's Salary       linear vs poly d2 differ by 2,377 (3.9% of the linear estimate)
+
+Plausibility check against the observed range:
+  ok David  Net worth   linear  =     47,885 within [22,000, 60,000]
+  ok David  Net worth   poly d2 =     48,555 within [22,000, 60,000]
+  ok David  Net worth   poly d3 =     43,952 within [22,000, 60,000]
+  !! Heidi  Age         linear  =      21.97 is OUTSIDE [22.00, 40.00] by 0.03
+  ok Heidi  Age         poly d2 =      22.46 within [22.00, 40.00]
+  !! Heidi  Age         poly d3 =      21.86 is OUTSIDE [22.00, 40.00] by 0.14
+  ok Heidi  Net worth   linear  =     23,691 within [22,000, 60,000]
+  ok Heidi  Net worth   poly d2 =     26,245 within [22,000, 60,000]
+  ok Heidi  Net worth   poly d3 =     28,049 within [22,000, 60,000]
+  ok Heidi  Salary      linear  =     61,579 within [55,000, 72,000]
+  ok Heidi  Salary      poly d2 =     63,956 within [55,000, 72,000]
+  ok Heidi  Salary      poly d3 =     63,864 within [55,000, 72,000]
+
+
+5. FIGURES WRITTEN
+------------------------------------------------------------------------------
+  figures\linear_vs_polynomial_fits.png
+  figures\overfitting_gap.png
+
+
+6. WHICH METHOD PREDICTS BETTER?
+------------------------------------------------------------------------------
+
+Tasks won, by criterion:
+  model                      by train RMSE   by LOOCV RMSE
+  Linear (degree 1)                      0               3
+  Polynomial (deg 2)                     0               1
+  Polynomial (deg 3)                     4               0
+
+Overfitting gap (LOOCV RMSE / training RMSE, 1.0 = no gap):
+  Net worth    Age              linear         1.3x
+  Net worth    Age              poly d2        1.6x
+  Net worth    Age              poly d3        3.4x
+  Age          Tenure (years)   linear         1.3x
+  Age          Tenure (years)   poly d2        3.2x
+  Age          Tenure (years)   poly d3       38.7x
+  Net worth    Tenure (years)   linear         1.6x
+  Net worth    Tenure (years)   poly d2        7.8x
+  Salary       Tenure (years)   linear         1.5x
+  Salary       Tenure (years)   poly d2        1.6x
+  Salary       Tenure (years)   poly d3       37.9x
+
+Polynomial LOOCV error relative to linear, per task (1.0 = equal):
+  Net worth    Age              poly d2      1.3x  (worse than linear)
+  Net worth    Age              poly d3      2.5x  (worse than linear)
+  Age          Tenure (years)   poly d2      2.4x  (worse than linear)
+  Age          Tenure (years)   poly d3     26.7x  (worse than linear)
+  Net worth    Tenure (years)   poly d2      4.6x  (worse than linear)
+  Salary       Tenure (years)   poly d2      0.9x  (better than linear)
+  Salary       Tenure (years)   poly d3     23.1x  (worse than linear)
+
+VERDICT
+------------------------------------------------------------------------------
+  LINEAR REGRESSION predicts these missing values better.
+
+  Won on training RMSE : polynomial d3 took all 4 tasks
+  Won on LOOCV RMSE    : linear took 3 of 4 tasks
+
+  Median polynomial-to-linear LOOCV ratio: 2.5x
+  Worst case: 27x the linear model's error
+
+  Why, in this dataset:
+
+  1. Sample size. Each model trains on 5-8 rows. A degree-2 curve spends 3
+     coefficients and a degree-3 curve spends 4; with 5 rows the cubic has
+     almost as many knobs as observations and can pass through the points
+     exactly. That is memorisation, not a learned relationship.
+
+  2. Training scores cannot detect this. R2 on the fitted points rises with
+     every degree added -- it is arithmetically unable to fall. Reporting it
+     alone, as the sample code does, would recommend the worst model.
+
+  3. Extrapolation. Imputed rows often sit near or past the edge of the
+     observed predictor range. A straight line leaving that range stays
+     plausible; a parabola or cubic accelerates away, which is how the
+     out-of-range predictions flagged in section 4 arise.
+
+  4. No curvature to find. Age-income and tenure-wealth relationships are
+     close to monotonic over these narrow ranges. The extra polynomial terms
+     have no real signal to fit, so they fit noise instead.
+
+  When polynomial regression WOULD be the right choice: a genuinely curved
+  relationship (diminishing returns, saturation, growth then decline) with
+  enough rows -- roughly 10+ per coefficient -- to distinguish curvature from
+  noise. The sample code demonstrates exactly that case: 100 points generated
+  from a true quadratic. Neither condition holds here.
+
+==============================================================================
+END OF REPORT
+==============================================================================
